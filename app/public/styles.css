@@ -1,0 +1,7 @@
+body { font-family: system-ui, Arial, sans-serif; margin: 2rem; }
+nav a { margin-right: 1rem; }
+label { display: block; margin-bottom: .5rem; }
+input { margin-left: .5rem; }
+button { margin-top: .5rem; }
+table { border-collapse: collapse; margin-top: 1rem; width: 100%; }
+th, td { border: 1px solid #ddd; padding: .5rem; }

@@ -1,0 +1,22 @@
+<%- include('../partials/layout', { body: '' }) %>
+<h1>Benutzer</h1>
+<form method="post" action="/admin/users">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <input name="email" type="email" placeholder="email" required />
+  <input name="name" placeholder="name" required />
+  <input name="password" type="password" placeholder="password" required />
+  <button type="submit">Anlegen</button>
+</form>
+<table>
+  <thead><tr><th>Email</th><th>Name</th><th>Aktiv</th><th>Rollen</th></tr></thead>
+  <tbody>
+    <% users.forEach(u => { %>
+      <tr>
+        <td><%= u.email %></td>
+        <td><%= u.name %></td>
+        <td><%= u.isActive %></td>
+        <td><%= u.roles.map(r => r.role.name).join(', ') %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

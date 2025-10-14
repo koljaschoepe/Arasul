@@ -1,0 +1,9 @@
+<% if (typeof error !== 'undefined') { %>
+<p style="color:red"><%= error %></p>
+<% } %>
+<form method="post" action="/admin/login">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <label>Email <input type="email" name="email" required /></label>
+  <label>Passwort <input type="password" name="password" required /></label>
+  <button type="submit">Login</button>
+</form>

@@ -1,0 +1,32 @@
+# Shard 05: API-Schnittstellen (Auszug)
+
+- `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/me`
+- `GET /api/system/stats` → CPU/GPU/RAM/Disk/Net/Temps
+- `GET /api/services` → Service-Status (healthy/unhealthy)
+- `POST /api/admin/service/{name}/{restart|start|stop}` (admin)
+- `POST /api/admin/system/{reboot|update}` (admin)
+- `GET /api/audit?limit=…`
+-
+- Benutzer (Admin):
+- `GET /api/admin/users?query=&role=&active=&limit=&offset=`
+- `POST /api/admin/users`
+- `GET /api/admin/users/{id}`
+- `PATCH /api/admin/users/{id}`
+- `DELETE /api/admin/users/{id}` (soft-disable)
+-
+- Rollen (Admin):
+- `GET /api/admin/roles`
+- `POST /api/admin/roles`
+- `GET /api/admin/roles/{id}`
+- `PATCH /api/admin/roles/{id}`
+- `DELETE /api/admin/roles/{id}`
+-
+- Rollenbindung (Admin):
+- `POST /api/admin/users/{id}/roles/{role}`
+- `DELETE /api/admin/users/{id}/roles/{role}`
+-
+- 2FA (TOTP):
+- `POST /api/auth/2fa/setup` (QR/Secret ausgeben, serverseitig temporär binden)
+- `POST /api/auth/2fa/verify` (TOTP-Code prüfen, 2FA aktivieren, Recovery-Codes ausgeben)
+- `POST /api/auth/2fa/disable` (mit Passwort/TOTP bestätigen)
+- `POST /api/auth/2fa/recovery` (Login via Recovery-Code)

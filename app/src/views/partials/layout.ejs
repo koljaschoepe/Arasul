@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <header>
+      <nav>
+        <a href="/admin">Dashboard</a>
+        <a href="/admin/users">Benutzer</a>
+        <a href="/admin/roles">Rollen</a>
+        <form method="post" action="/admin/logout" style="display:inline">
+          <button type="submit">Logout</button>
+        </form>
+      </nav>
+    </header>
+    <main>
+      <%- body %>
+    </main>
+  </body>
+</html>

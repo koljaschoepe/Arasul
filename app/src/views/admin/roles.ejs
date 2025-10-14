@@ -1,0 +1,20 @@
+<%- include('../partials/layout', { body: '' }) %>
+<h1>Rollen</h1>
+<form method="post" action="/admin/roles">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <input name="name" placeholder="name" required />
+  <input name="description" placeholder="description" />
+  <button type="submit">Anlegen</button>
+</form>
+<table>
+  <thead><tr><th>Name</th><th>Beschreibung</th><th>Aktiv</th></tr></thead>
+  <tbody>
+    <% roles.forEach(r => { %>
+      <tr>
+        <td><%= r.name %></td>
+        <td><%= r.description %></td>
+        <td><%= r.isActive %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

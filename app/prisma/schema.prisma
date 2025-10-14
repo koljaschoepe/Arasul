@@ -1,0 +1,66 @@
+// datasource and generator
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String        @id @default(cuid())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  email             String        @unique
+  name              String
+  passwordHash      String
+  isActive          Boolean       @default(true)
+  twoFactorEnabled  Boolean       @default(false)
+  twoFactorSecret   String?
+  recoveryCodes     String        @default("[]") // JSON-Array von gehashten Codes
+  roles             UserRole[]
+  authoredAuditLogs AuditEvent[]  @relation("AuditActor")
+  targetAuditLogs   AuditEvent[]  @relation("AuditTargetUser")
+}
+
+model Role {
+  id               String        @id @default(cuid())
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  name             String        @unique
+  description      String?
+  isActive         Boolean       @default(true)
+  users            UserRole[]
+  targetAuditLogs  AuditEvent[]  @relation("AuditTargetRole")
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  assignedBy String?
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model AuditEvent {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  actorUserId   String?
+  targetUserId  String?
+  targetRoleId  String?
+  entityType    String
+  action        String
+  before        Json?
+  after         Json?
+
+  actor       User? @relation("AuditActor", fields: [actorUserId], references: [id])
+  targetUser  User? @relation("AuditTargetUser", fields: [targetUserId], references: [id])
+  targetRole  Role? @relation("AuditTargetRole", fields: [targetRoleId], references: [id])
+
+  @@index([entityType])
+}
