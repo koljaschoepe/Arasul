@@ -1,0 +1,189 @@
+# Prometheus Alert Rules
+# Story E1.2: Security-Header-Monitoring
+# Arasul Project
+
+groups:
+  - name: security_headers
+    interval: 30s
+    rules:
+      # ======================================================================
+      # Security-Header Alerts
+      # ======================================================================
+
+      # Alert: HSTS-Header fehlt
+      - alert: MissingHSTSHeader
+        expr: security_header_status{header_name="strict-transport-security"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: security
+          category: headers
+        annotations:
+          summary: "HSTS-Header fehlt auf {{ $labels.endpoint }}"
+          description: "Der Strict-Transport-Security Header fehlt auf Endpoint {{ $labels.endpoint }}. Dies ist ein kritisches Security-Risiko."
+          remediation: "Prüfen Sie die Caddy-Konfiguration (HSTS-Header) und starten Sie den Caddy-Service neu."
+
+      # Alert: CSP-Header fehlt
+      - alert: MissingCSPHeader
+        expr: security_header_status{header_name="content-security-policy"} == 0
+        for: 5m
+        labels:
+          severity: high
+          component: security
+          category: headers
+        annotations:
+          summary: "Content-Security-Policy Header fehlt auf {{ $labels.endpoint }}"
+          description: "Der CSP-Header fehlt auf Endpoint {{ $labels.endpoint }}. Dies erhöht das XSS-Risiko."
+          remediation: "Prüfen Sie die Helmet-Konfiguration im Backend (server.ts) und starten Sie den API-Service neu."
+
+      # Alert: X-Frame-Options fehlt
+      - alert: MissingXFrameOptions
+        expr: security_header_status{header_name="x-frame-options"} == 0
+        for: 5m
+        labels:
+          severity: high
+          component: security
+          category: headers
+        annotations:
+          summary: "X-Frame-Options Header fehlt auf {{ $labels.endpoint }}"
+          description: "Der X-Frame-Options Header fehlt auf Endpoint {{ $labels.endpoint }}. Dies erhöht das Clickjacking-Risiko."
+          remediation: "Prüfen Sie die Helmet-Konfiguration im Backend (server.ts)."
+
+      # Alert: X-Content-Type-Options fehlt
+      - alert: MissingXContentTypeOptions
+        expr: security_header_status{header_name="x-content-type-options"} == 0
+        for: 5m
+        labels:
+          severity: medium
+          component: security
+          category: headers
+        annotations:
+          summary: "X-Content-Type-Options Header fehlt auf {{ $labels.endpoint }}"
+          description: "Der X-Content-Type-Options Header fehlt auf Endpoint {{ $labels.endpoint }}."
+          remediation: "Prüfen Sie die Helmet-Konfiguration im Backend (server.ts)."
+
+      # Alert: Hohe Anzahl fehlender Security-Header
+      - alert: HighMissingSecurityHeadersRate
+        expr: rate(security_headers_missing_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+          category: headers
+        annotations:
+          summary: "Hohe Rate an fehlenden Security-Headern"
+          description: "Mehr als 10 Requests pro Sekunde haben fehlende Security-Header ({{ $labels.header_name }})."
+          remediation: "Prüfen Sie die Konfiguration und Logs des API-Services."
+
+  # ========================================================================
+  # TLS/Zertifikats-Alerts
+  # ========================================================================
+
+  - name: tls_certificates
+    interval: 60s
+    rules:
+      # Alert: Zertifikat läuft in 30 Tagen ab
+      - alert: TLSCertificateExpiryWarning
+        expr: tls_certificate_expiry_seconds < (30 * 24 * 60 * 60)
+        for: 1h
+        labels:
+          severity: warning
+          component: security
+          category: certificates
+        annotations:
+          summary: "TLS-Zertifikat läuft bald ab"
+          description: "Das TLS-Zertifikat läuft in weniger als 30 Tagen ab ({{ $value | humanizeDuration }})."
+          remediation: "Führen Sie das Zertifikatserneuerungsskript aus: docker-compose exec step-ca /scripts/renew-cert.sh"
+
+      # Alert: Zertifikat läuft in 7 Tagen ab
+      - alert: TLSCertificateExpiryCritical
+        expr: tls_certificate_expiry_seconds < (7 * 24 * 60 * 60)
+        for: 1h
+        labels:
+          severity: critical
+          component: security
+          category: certificates
+        annotations:
+          summary: "TLS-Zertifikat läuft kritisch bald ab!"
+          description: "Das TLS-Zertifikat läuft in weniger als 7 Tagen ab ({{ $value | humanizeDuration }})! SOFORTIGE AKTION ERFORDERLICH."
+          remediation: "DRINGEND: Führen Sie das Zertifikatserneuerungsskript aus und starten Sie Caddy neu."
+
+      # Alert: Zertifikat ist abgelaufen
+      - alert: TLSCertificateExpired
+        expr: tls_certificate_expiry_seconds <= 0
+        for: 1m
+        labels:
+          severity: critical
+          component: security
+          category: certificates
+        annotations:
+          summary: "TLS-Zertifikat ist ABGELAUFEN!"
+          description: "Das TLS-Zertifikat ist abgelaufen! Alle HTTPS-Verbindungen werden fehlschlagen."
+          remediation: "SOFORT: Zertifikat erneuern und Caddy neu starten."
+
+      # Alert: TLS 1.2 oder niedriger in Verwendung
+      - alert: WeakTLSVersion
+        expr: tls_version < 13
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+          category: tls
+        annotations:
+          summary: "Schwache TLS-Version in Verwendung"
+          description: "TLS 1.2 oder niedriger wird verwendet. TLS 1.3 sollte bevorzugt werden."
+          remediation: "Prüfen Sie die Caddy TLS-Konfiguration (protocols tls1.3)."
+
+  # ========================================================================
+  # Application Health Alerts
+  # ========================================================================
+
+  - name: application_health
+    interval: 30s
+    rules:
+      # Alert: Hohe HTTP-Fehlerrate (5xx)
+      - alert: HighServerErrorRate
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m])) 
+          / 
+          sum(rate(http_requests_total[5m])) 
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: application
+          category: availability
+        annotations:
+          summary: "Hohe Server-Fehlerrate (5xx)"
+          description: "Mehr als 5% der Requests resultieren in 5xx-Fehlern."
+          remediation: "Prüfen Sie die API-Logs: docker-compose logs api"
+
+      # Alert: Hohe HTTP-Latenz
+      - alert: HighRequestLatency
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+          category: performance
+        annotations:
+          summary: "Hohe Request-Latenz"
+          description: "95% der Requests dauern länger als 2 Sekunden."
+          remediation: "Prüfen Sie die API-Performance und Datenbankabfragen."
+
+      # Alert: API-Service nicht erreichbar
+      - alert: APIServiceDown
+        expr: up{job="arasul-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: application
+          category: availability
+        annotations:
+          summary: "API-Service ist nicht erreichbar"
+          description: "Der Backend-API-Service antwortet nicht auf Prometheus-Scrapes."
+          remediation: "Prüfen Sie den API-Container-Status: docker-compose ps api && docker-compose logs api"
+

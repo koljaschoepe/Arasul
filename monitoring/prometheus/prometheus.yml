@@ -1,0 +1,71 @@
+# Prometheus Configuration
+# Story E1.2: Security-Header-Monitoring
+# Arasul Project
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'arasul'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#             - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - '/etc/prometheus/alerts/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Backend API Metrics
+  - job_name: 'arasul-api'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['api:3000']
+        labels:
+          service: 'backend-api'
+          component: 'application'
+    
+    # HTTP-Basic-Auth (optional, falls /metrics geschützt werden soll)
+    # basic_auth:
+    #   username: 'prometheus'
+    #   password: '${PROMETHEUS_PASSWORD}'
+
+  # Caddy Metrics (falls Caddy mit Prometheus-Plugin kompiliert)
+  # - job_name: 'caddy'
+  #   metrics_path: '/metrics'
+  #   static_configs:
+  #     - targets: ['caddy:2019']
+  #       labels:
+  #         service: 'reverse-proxy'
+  #         component: 'infrastructure'
+
+  # PostgreSQL Exporter (zukünftig)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #       labels:
+  #         service: 'database'
+  #         component: 'infrastructure'
+
+  # Node Exporter (System-Metriken vom Host)
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+  #       labels:
+  #         service: 'system'
+  #         component: 'infrastructure'
+
+  # step-ca Metrics (falls verfügbar)
+  # - job_name: 'step-ca'
+  #   static_configs:
+  #     - targets: ['step-ca:9000']
+  #       labels:
+  #         service: 'certificate-authority'
+  #         component: 'security'
+

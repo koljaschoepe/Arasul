@@ -1,6 +1,6 @@
-# Jetson Admin (E1.1)
+# Jetson Admin Backend (E1.1 + E1.2)
 
-Diese App liefert Benutzer- & Rollenverwaltung (RBAC), optional 2FA (TOTP), Audit-Logging und eine minimale Admin-UI.
+Diese App liefert Benutzer- & Rollenverwaltung (RBAC), optional 2FA (TOTP), Audit-Logging und eine minimale Admin-UI. In Produktion läuft sie hinter Caddy (TLS-Terminierung) im Docker-Container.
 
 ## Schnellstart
 
@@ -40,11 +40,28 @@ Diese App liefert Benutzer- & Rollenverwaltung (RBAC), optional 2FA (TOTP), Audi
 - `AuditEvent` zeichnet Wer/Was/Wann mit Before/After auf
 - Aktionen: Login/Logout, User/Rollen Create/Update/Deactivate, Rollen-Zuweisung
 
-## Security-Hinweise
+## Security (E1.1 + E1.2)
 
-- `helmet` aktiviert, CORS ist permissiv für lokale Entwicklung (Credentials aktiv)
-- Setze `SESSION_SECRET` und aktiviere `cookie.secure` hinter TLS
-- Produktionsbetrieb: TLS-Termination, HSTS, sichere Cookies, Rate-Limiting, CSRF für Formular-POSTs (optional)
+### Helmet Security-Header (E1.2)
+- ✅ CSP mit `frame-src 'self'` für Guacamole-Iframe (E4.x)
+- ✅ X-Frame-Options: `SAMEORIGIN`
+- ✅ X-Content-Type-Options: `nosniff`
+- ✅ Referrer-Policy: `strict-origin-when-cross-origin`
+- ✅ X-Powered-By entfernt
+- ⚠️ HSTS wird von Caddy gesetzt (Transport-Layer)
+
+### Application Security (E1.1)
+- ✅ Session-basierte Authentifizierung
+- ✅ CSRF-Schutz (doubleCsrf für POST/PUT/DELETE)
+- ✅ Rate-Limiting (Auth: 5/10min, API: 100/15min)
+- ✅ Session-Timeout: 15 min Idle
+- ✅ Session-Cookies: `httpOnly`, `secure` (Produktion), `sameSite=strict`
+
+### Deployment Security
+- Setze `SESSION_SECRET` in `.env` (KRITISCH!)
+- `cookie.secure=true` automatisch in Produktion (NODE_ENV=production)
+- TLS-Terminierung via Caddy (siehe `/jetson/caddy/`)
+- Reverse-Proxy: Backend nicht direkt exponiert
 
 ## Tests
 

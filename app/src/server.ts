@@ -13,6 +13,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import adminRoutes from './routes/admin.js';
 import { sessionTimeout } from './middlewares/sessionTimeout.js';
+import { 
+  metricsHandler, 
+  trackSecurityHeaders, 
+  trackHttpMetrics 
+} from './services/prometheusService.js';
 
 dotenv.config();
 
@@ -29,7 +34,28 @@ const __dirname = path.dirname(__filename);
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 app.use(express.urlencoded({ extended: true }));
-app.use(helmet());
+// Helmet Security-Header Konfiguration (Story E1.2)
+// CSP mit frame-src 'self' für Guacamole-Iframe (E4.x)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      frameSrc: ["'self'"],  // Erforderlich für Guacamole-Iframe
+      scriptSrc: ["'self'", "'unsafe-inline'"],  // EJS-Templates benötigen unsafe-inline
+      styleSrc: ["'self'", "'unsafe-inline'"],   // EJS-Templates benötigen unsafe-inline
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameAncestors: ["'self'"],  // Korrektur: frameAncestors statt frameSrcAncestors
+    },
+  },
+  referrerPolicy: {
+    policy: 'strict-origin-when-cross-origin',
+  },
+  hsts: false,  // HSTS wird von Caddy gesetzt (Transport-Layer)
+}));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
@@ -90,7 +116,14 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Prometheus Monitoring Middleware
+app.use(trackHttpMetrics);
+app.use(trackSecurityHeaders);
+
 app.use('/public', express.static(path.join(__dirname, '..', 'public')));
+
+// Prometheus Metrics Endpoint
+app.get('/metrics', metricsHandler);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 

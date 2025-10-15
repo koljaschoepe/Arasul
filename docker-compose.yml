@@ -1,0 +1,242 @@
+services:
+  # Caddy - TLS-Terminierung & Reverse-Proxy (Story E1.2)
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"    # HTTP → HTTPS Redirect
+      - "443:443"  # HTTPS (TLS-Terminierung)
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data         # TLS-Zertifikate & Konfiguration
+      - caddy_config:/config     # Caddy-Runtime-Config
+      - step_ca_certs:/certs:ro  # step-ca Zertifikate (read-only)
+    networks:
+      - arasul-net
+    depends_on:
+      - api
+      - step-ca
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # step-ca Certificate Authority (Phase 1.5)
+  step-ca:
+    image: smallstep/step-ca:latest
+    container_name: step-ca
+    restart: unless-stopped
+    expose:
+      - "9000"
+    volumes:
+      - ./step-ca/config:/home/step/config:ro
+      - ./step-ca/scripts:/scripts:ro
+      - step_ca_certs:/home/step/certs
+      - step_ca_secrets:/home/step/secrets
+      - step_ca_db:/home/step/db
+    networks:
+      - arasul-net
+    environment:
+      - DOCKER_STEPCA_INIT_NAME=Arasul CA
+      - DOCKER_STEPCA_INIT_DNS_NAMES=step-ca,localhost
+    # Cron-Job für automatische Zertifikatserneuerung (täglich 3:00 Uhr)
+    entrypoint: ["/bin/sh", "-c", "echo '0 3 * * * /scripts/renew-cert.sh >> /var/log/cert-renewal.log 2>&1' | crontab - && crond && sleep infinity"]
+
+  # Backend-API (Express) - Story E1.1
+  api:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: api
+    restart: unless-stopped
+    # Port 3000 für Development/Testing exponiert (für Prometheus Scraping & Direktzugriff)
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
+      - DATABASE_URL=file:./dev.db
+      - PORT=3000
+    volumes:
+      - ./app/prisma:/app/prisma
+      - api_data:/app/data
+    networks:
+      - arasul-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # PostgreSQL Database (für Produktion)
+  # TODO: Aktivieren wenn von SQLite zu PostgreSQL migriert
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_USER=arasul
+  #     - POSTGRES_PASSWORD=${DB_PASSWORD}
+  #     - POSTGRES_DB=arasul
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - arasul-net
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U arasul"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # n8n Automation Platform (Story E2.x)
+  # TODO: Implementierung in E2.1
+  # n8n:
+  #   image: n8nio/n8n:latest
+  #   container_name: n8n
+  #   restart: unless-stopped
+  #   expose:
+  #     - "5678"
+  #   environment:
+  #     - N8N_BASIC_AUTH_ACTIVE=true
+  #     - N8N_BASIC_AUTH_USER=${N8N_USER}
+  #     - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+  #     - N8N_PATH=/n8n
+  #   volumes:
+  #     - n8n_data:/home/node/.n8n
+  #   networks:
+  #     - arasul-net
+
+  # MinIO Object Storage (Story E3.x)
+  # TODO: Implementierung in E3.1
+  # minio:
+  #   image: minio/minio:latest
+  #   container_name: minio
+  #   restart: unless-stopped
+  #   expose:
+  #     - "9001"  # Console
+  #     - "9000"  # S3 API
+  #   environment:
+  #     - MINIO_ROOT_USER=${MINIO_USER}
+  #     - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD}
+  #     - MINIO_BROWSER_REDIRECT_URL=/minio
+  #   volumes:
+  #     - minio_data:/data
+  #   command: server /data --console-address ":9001"
+  #   networks:
+  #     - arasul-net
+
+  # Apache Guacamole (Story E4.x)
+  # TODO: Implementierung in E4.1
+  # guacamole:
+  #   image: guacamole/guacamole:latest
+  #   container_name: guacamole
+  #   restart: unless-stopped
+  #   expose:
+  #     - "8080"
+  #   environment:
+  #     - GUACD_HOSTNAME=guacd
+  #   networks:
+  #     - arasul-net
+  #   depends_on:
+  #     - guacd
+
+  # guacd:
+  #   image: guacamole/guacd:latest
+  #   container_name: guacd
+  #   restart: unless-stopped
+  #   networks:
+  #     - arasul-net
+
+  # Prometheus - Monitoring & Alerting (Story E1.2 Phase 1.5)
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"  # Prometheus UI (nur lokal)
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    networks:
+      - arasul-net
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Grafana - Dashboards & Visualisierung (Story E1.2 Phase 1.5)
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # Grafana UI (Port 3000 -> 3001 wegen Konflikt mit API)
+    environment:
+      - GF_SERVER_ROOT_URL=https://arasul.local/monitor
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-change-me-in-production}
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - arasul-net
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+  api_data:
+    driver: local
+  step_ca_certs:
+    driver: local
+  step_ca_secrets:
+    driver: local
+  step_ca_db:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  # postgres_data:
+  #   driver: local
+  # n8n_data:
+  #   driver: local
+  # minio_data:
+  #   driver: local
+
+networks:
+  arasul-net:
+    driver: bridge
+    ipam:
+      config:
+        # Internes Docker-Netzwerk (nicht 10.80.x.0/24 VPN-Range!)
+        - subnet: 172.20.0.0/16
+

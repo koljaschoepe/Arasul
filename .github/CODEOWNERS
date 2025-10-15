@@ -1,0 +1,22 @@
+# Code Owners für Arasul Project
+# Story E1.2: Automated Code Review
+
+# Default: Alle Dateien
+* @arasul-team
+
+# Security-kritische Dateien: Mandatory Review
+/caddy/Caddyfile @security-team
+/app/src/middlewares/ @security-team
+/monitoring/prometheus/alerts/ @security-team
+/step-ca/ @security-team
+
+# Docker & Infrastructure
+/docker-compose.yml @devops-team
+/app/Dockerfile @devops-team
+
+# Backend-Code
+/app/src/ @backend-team
+
+# Tests
+/app/src/__tests__/ @qa-team
+

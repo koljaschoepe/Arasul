@@ -1,0 +1,105 @@
+# Arasul TLS & Reverse Proxy Configuration
+# Self-signed für MVP; step-ca Migration in Phase 1.5
+# Story E1.2: TLS & Security-Header A+
+
+{
+    # Global Options
+    # auto_https off deaktiviert, damit Caddy TLS managed
+}
+
+# HTTPS Server (Port 443)
+https://arasul.local:443 {
+    # TLS 1.3 bevorzugt, Fallback auf TLS 1.2 mit sicheren Ciphers
+    tls internal {
+        protocols tls1.2 tls1.3
+    }
+
+    # Transport-Layer Security Headers
+    # Content-Security-Header werden von Helmet (Express) gesetzt
+    header {
+        # HSTS: HTTP Strict Transport Security
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        
+        # Server-Header entfernen (Security Best Practice)
+        -Server
+        
+        # X-Powered-By entfernen (falls vorhanden)
+        -X-Powered-By
+    }
+
+    # Dashboard Frontend (React/Static)
+    # TODO: Placeholder - wird in späteren Stories implementiert
+    # reverse_proxy / dashboard:3000
+
+    # Backend API (Express mit Helmet)
+    # Helmet setzt Content-Security-Header (CSP, XFO, etc.)
+    reverse_proxy /api/* api:3000 {
+        # Client-IP-Propagierung für korrekte Audit-Logs
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+    }
+
+    # n8n Automation Platform
+    # TODO: Wird in E2.x implementiert
+    # reverse_proxy /n8n* n8n:5678 {
+    #     header_up X-Real-IP {remote_host}
+    #     header_up X-Forwarded-Proto {scheme}
+    # }
+
+    # MinIO Console & S3 API
+    # TODO: Wird in E3.x implementiert
+    # reverse_proxy /minio* minio:9001 {
+    #     header_up X-Real-IP {remote_host}
+    #     header_up X-Forwarded-Proto {scheme}
+    # }
+
+    # Apache Guacamole Web-Konsole
+    # TODO: Wird in E4.x implementiert
+    # CSP frame-src 'self' erforderlich für Iframe-Embedding (via Helmet)
+    # reverse_proxy /guacamole* guacamole:8080 {
+    #     header_up X-Real-IP {remote_host}
+    #     header_up X-Forwarded-Proto {scheme}
+    # }
+
+    # Monitoring/Logs UI (Prometheus/Grafana)
+    # TODO: Wird in E7.x implementiert
+    # reverse_proxy /monitor* monitoring:3000 {
+    #     header_up X-Real-IP {remote_host}
+    #     header_up X-Forwarded-Proto {scheme}
+    # }
+
+    # Prometheus Metrics Endpoint (Security-Header-Monitoring)
+    # TODO: Aktivieren nach Implementierung in E1.2 (Prometheus Integration)
+    # reverse_proxy /metrics api:3000 {
+    #     header_up X-Real-IP {remote_host}
+    #     header_up X-Forwarded-Proto {scheme}
+    # }
+
+    # Health-Check Endpoint (direkt auf API)
+    reverse_proxy /health api:3000
+
+    # Root-Pfad: Redirect zu /admin (Dashboard-UI)
+    # TODO: In MVP zu Backend-Admin-UI, später zu React-Dashboard
+    reverse_proxy / api:3000 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# HTTP Server (Port 80) - Redirect zu HTTPS
+http://arasul.local:80 {
+    # 301 Permanent Redirect zu HTTPS
+    redir https://arasul.local{uri} permanent
+}
+
+# MIGRATION NOTES (Phase 1.5 - step-ca Integration):
+# Aktuell: tls internal (self-signed, automatisch von Caddy generiert)
+# Zukünftig: tls /certs/arasul.crt /certs/arasul.key {
+#   ca /certs/root_ca.crt
+#   protocols tls1.2 tls1.3
+# }
+# step-ca wird Zertifikate via Volume-Mount bereitstellen
+

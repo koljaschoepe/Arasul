@@ -1,0 +1,18 @@
+# Grafana Dashboard Provisioning
+# Story E1.2 Phase 1.5
+# Auto-Import von Dashboards
+
+apiVersion: 1
+
+providers:
+  - name: 'Arasul Dashboards'
+    orgId: 1
+    folder: 'Arasul'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true
+
