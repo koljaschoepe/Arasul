@@ -9,6 +9,7 @@ import { doubleCsrf } from 'csrf-csrf';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import roleRoutes from './routes/roles.js';
+import vpnRoutes from './routes/vpn.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import adminRoutes from './routes/admin.js';
@@ -132,6 +133,7 @@ app.use('/auth/login', authLimiter); // Strenger Limiter für Login
 app.use('/auth', authRoutes);
 app.use('/users', apiLimiter, userRoutes);
 app.use('/roles', apiLimiter, roleRoutes);
+app.use('/api/vpn', apiLimiter, vpnRoutes); // E1.3: VPN-Status (admin-only)
 // Admin-UI: CSRF-Schutz für POST/PUT/DELETE (GET ausgenommen)
 app.use('/admin', csrfProtection.doubleCsrfProtection, adminRoutes);
 app.use('/', (req, res) => res.redirect('/admin'));
