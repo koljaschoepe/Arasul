@@ -1,0 +1,218 @@
+name: Security Audit
+
+on:
+  schedule:
+    # Täglich um 3:00 UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Manuelle Ausführung
+  push:
+    branches: [ main ]
+
+jobs:
+  # ==========================================================================
+  # Job 1: Dependency Audit
+  # ==========================================================================
+  dependency-audit:
+    name: NPM Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run NPM Audit
+        working-directory: ./app
+        run: |
+          npm audit --audit-level=moderate --production
+        continue-on-error: true
+
+      - name: Generate Audit Report
+        working-directory: ./app
+        run: |
+          npm audit --json > audit-report.json || true
+          cat audit-report.json
+
+      - name: Upload Audit Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: app/audit-report.json
+
+  # ==========================================================================
+  # Job 2: Docker Image Scan (Trivy)
+  # ==========================================================================
+  container-scan:
+    name: Docker Image Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        working-directory: ./app
+        run: |
+          docker build -t arasul-api:scan -f Dockerfile .
+
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'arasul-api:scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy Results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy (Table Output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'arasul-api:scan'
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+  # ==========================================================================
+  # Job 3: Security-Header Compliance Check
+  # ==========================================================================
+  security-headers-check:
+    name: Security-Header Compliance
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Start Services
+        run: |
+          docker-compose up -d
+        env:
+          SESSION_SECRET: 'audit-secret'
+
+      - name: Wait for API
+        run: |
+          timeout 60 bash -c 'until curl -sf http://localhost:3000/health; do sleep 2; done'
+
+      - name: Check Security Headers Compliance
+        run: |
+          echo "=== Security-Header Compliance Check ==="
+          
+          # HSTS prüfen
+          if curl -skI https://localhost/health | grep -qi "strict-transport-security"; then
+            echo "✅ HSTS: PASSED"
+          else
+            echo "❌ HSTS: FAILED"
+            exit 1
+          fi
+          
+          # CSP prüfen
+          if curl -skI https://localhost/health | grep -qi "content-security-policy"; then
+            echo "✅ CSP: PASSED"
+          else
+            echo "❌ CSP: FAILED"
+            exit 1
+          fi
+          
+          # X-Frame-Options prüfen
+          if curl -skI https://localhost/health | grep -qi "x-frame-options"; then
+            echo "✅ X-Frame-Options: PASSED"
+          else
+            echo "❌ X-Frame-Options: FAILED"
+            exit 1
+          fi
+          
+          # X-Content-Type-Options prüfen
+          if curl -skI https://localhost/health | grep -qi "x-content-type-options"; then
+            echo "✅ X-Content-Type-Options: PASSED"
+          else
+            echo "❌ X-Content-Type-Options: FAILED"
+            exit 1
+          fi
+          
+          echo "✅ Alle Security-Header vorhanden"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker-compose down -v
+
+  # ==========================================================================
+  # Job 4: TLS Certificate Expiry Check
+  # ==========================================================================
+  cert-expiry-check:
+    name: TLS Certificate Expiry
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Start Services
+        run: |
+          docker-compose up -d
+        env:
+          SESSION_SECRET: 'audit-secret'
+
+      - name: Wait for Caddy
+        run: |
+          timeout 60 bash -c 'until docker-compose ps | grep -q "caddy.*Up"; do sleep 2; done'
+
+      - name: Check Certificate Expiry
+        run: |
+          # Zertifikatsablauf prüfen (warnen wenn <30 Tage)
+          EXPIRY_DATE=$(echo | openssl s_client -connect localhost:443 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)
+          EXPIRY_EPOCH=$(date -d "$EXPIRY_DATE" +%s)
+          CURRENT_EPOCH=$(date +%s)
+          DAYS_REMAINING=$(( ($EXPIRY_EPOCH - $CURRENT_EPOCH) / 86400 ))
+          
+          echo "Zertifikat läuft ab: $EXPIRY_DATE"
+          echo "Verbleibende Tage: $DAYS_REMAINING"
+          
+          if [ $DAYS_REMAINING -lt 30 ]; then
+            echo "⚠️ WARNUNG: Zertifikat läuft in weniger als 30 Tagen ab!"
+            exit 1
+          else
+            echo "✅ Zertifikat noch gültig"
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker-compose down -v
+
+  # ==========================================================================
+  # Job 5: Security Audit Summary
+  # ==========================================================================
+  audit-summary:
+    name: Security Audit Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, container-scan, security-headers-check, cert-expiry-check]
+    if: always()
+    
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "=== Security Audit Summary ==="
+          echo "Dependency Audit: ${{ needs.dependency-audit.result }}"
+          echo "Container Scan: ${{ needs.container-scan.result }}"
+          echo "Security Headers: ${{ needs.security-headers-check.result }}"
+          echo "Cert Expiry: ${{ needs.cert-expiry-check.result }}"
+          
+          if [[ "${{ needs.dependency-audit.result }}" == "success" ]] && \
+             [[ "${{ needs.container-scan.result }}" == "success" ]] && \
+             [[ "${{ needs.security-headers-check.result }}" == "success" ]] && \
+             [[ "${{ needs.cert-expiry-check.result }}" == "success" ]]; then
+            echo "✅ Security Audit erfolgreich!"
+            exit 0
+          else
+            echo "❌ Security Audit fehlgeschlagen"
+            exit 1
+          fi
+
