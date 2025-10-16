@@ -16,6 +16,13 @@ https://:443 {
 
     # Transport-Layer Security Headers
     # Content-Security-Header werden von Helmet (Express) gesetzt
+    # Access-Logs für Debug/CI
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+
     header {
         # HSTS: HTTP Strict Transport Security
         Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"

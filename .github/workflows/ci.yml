@@ -286,6 +286,9 @@ jobs:
           timeout 180 bash -c 'until curl -sf http://localhost:3000/health; do sleep 2; done'
           echo "✓ API Health (HTTP) erreichbar"
           echo "Warte bis HTTPS (über Caddy) bereit ist..."
+          # Prüfe zunächst HTTP via Caddy (Port 80), um Reverse Proxy Pfade zu verifizieren
+          timeout 60 bash -c 'until curl -sI http://localhost/health | grep -q "200"; do sleep 2; done'
+          # Dann HTTPS über 8443 (gemappt auf 443 im Container)
           timeout 180 bash -c 'until curl -skI https://localhost:8443/health | grep -q "200"; do sleep 2; done'
           echo "✓ HTTPS Health erreichbar"
 
