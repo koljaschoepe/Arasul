@@ -7,7 +7,8 @@ WORKDIR /app
 
 # Dependencies installieren (cached wenn package.json unverändert)
 COPY package*.json ./
-RUN npm ci --only=production
+# Für TypeScript-Build werden Dev-Dependencies benötigt (z.B. @types/node)
+RUN npm ci
 
 # TypeScript Build
 COPY . .
@@ -18,14 +19,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Nur Production-Dependencies und Build-Output kopieren
-COPY --from=builder /app/node_modules ./node_modules
+# Nur Production-Dependencies installieren und Build-Output kopieren
+COPY package*.json ./
+RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/public ./public
 
-# Prisma Client generieren
+# Prisma Client generieren (benötigt schema unter ./prisma)
 RUN npx prisma generate
 
 # Non-root User für Security

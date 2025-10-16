@@ -159,6 +159,7 @@ jobs:
           docker build -t arasul-api:ci -f Dockerfile .
 
       - name: Start Services (Docker Compose)
+        working-directory: ./
         run: |
           # Temporäres docker-compose.ci.yml verwenden
           cp docker-compose.yml docker-compose.ci.yml
@@ -185,11 +186,13 @@ jobs:
 
       - name: Docker Logs (on failure)
         if: failure()
+        working-directory: ./
         run: |
           docker compose -f docker-compose.ci.yml logs
 
       - name: Cleanup
         if: always()
+        working-directory: ./
         run: |
           docker compose -f docker-compose.ci.yml down -v
 
@@ -206,12 +209,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Start Full Stack (with Caddy)
+        working-directory: ./
         run: |
           docker compose up -d
         env:
           SESSION_SECRET: ${{ env.SESSION_SECRET }}
 
       - name: Wait for Services
+        working-directory: ./
         run: |
           timeout 90 bash -c 'until docker compose ps | grep -q "caddy.*Up"; do sleep 2; done'
           echo "✓ Services gestartet"
@@ -240,12 +245,14 @@ jobs:
 
       - name: Docker Logs (on failure)
         if: failure()
+        working-directory: ./
         run: |
           docker compose logs caddy
           docker compose logs api
 
       - name: Cleanup
         if: always()
+        working-directory: ./
         run: |
           docker compose down -v
 
