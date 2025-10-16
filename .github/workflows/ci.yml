@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
 env:
   NODE_VERSION: '20'
   SESSION_SECRET: 'test-secret-for-ci'
@@ -125,6 +130,8 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ==========================================================================
   # Job 3: Security-Header Integration Tests
