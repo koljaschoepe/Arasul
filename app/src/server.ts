@@ -62,6 +62,11 @@ app.use(helmet({
     preload: true,
   },
 }));
+// Sicherstellen, dass HSTS-Header in jeder Response vorhanden ist (auch hinter Proxy)
+app.use((_, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  next();
+});
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
