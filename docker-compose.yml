@@ -52,37 +52,12 @@ services:
       dockerfile: Dockerfile
     container_name: api
     restart: unless-stopped
-    # In Produktion keinen Host-Port binden; Zugriff nur via Caddy/Netz
-    environment:
-      - NODE_ENV=production
-      - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
-      - DATABASE_URL=file:./dev.db
-      - PORT=3000
-    volumes:
-      - ./app/prisma:/app/prisma
-      - api_data:/app/data
-    networks:
-      - arasul-net
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-
-  # Entwicklungsservice mit Port-Bind
-  api-dev:
-    build:
-      context: ./app
-      dockerfile: Dockerfile
-    container_name: api-dev
-    restart: unless-stopped
-    profiles: ["dev"]
+    # Port 3000 für Development/Testing exponiert (für Prometheus Scraping & Direktzugriff)
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
-      - SESSION_SECRET=${SESSION_SECRET:-dev-secret}
+      - NODE_ENV=production
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
       - DATABASE_URL=file:./dev.db
       - PORT=3000
     volumes:
