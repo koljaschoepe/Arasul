@@ -99,8 +99,8 @@ https://:443 {
 
 # HTTP Server (Port 80) – allgemein für localhost & interne Nutzung
 http://:80 {
-    # Health direkt erreichbar halten (für einfache Probes ohne TLS)
-    reverse_proxy /health api:3000
+    # Health direkt beantworten (ohne Upstream), damit CI-HTTP-Check stabil ist
+    respond /health 200
 
     # Sonst auf HTTPS umleiten, Host übernehmen
     redir https://{host}{uri} permanent
