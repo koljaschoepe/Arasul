@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import client from 'prom-client';
 
 /**
@@ -84,7 +84,7 @@ const activeSessionsGauge = new client.Gauge({
 /**
  * Middleware zum Tracking von Security-Headern
  */
-export function trackSecurityHeaders(req: Request, res: Response, next: Function) {
+export function trackSecurityHeaders(req: Request, res: Response, next: NextFunction) {
   const originalSend = res.send;
 
   res.send = function (data: any) {
@@ -122,7 +122,7 @@ export function trackSecurityHeaders(req: Request, res: Response, next: Function
 /**
  * Middleware zum Tracking von HTTP-Metriken
  */
-export function trackHttpMetrics(req: Request, res: Response, next: Function) {
+export function trackHttpMetrics(req: Request, res: Response, next: NextFunction) {
   const start = Date.now();
 
   res.on('finish', () => {

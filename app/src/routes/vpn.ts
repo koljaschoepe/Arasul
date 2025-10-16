@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { requireRoles } from '../middlewares/rbac.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -14,7 +15,7 @@ const execAsync = promisify(exec);
  * Nur für Admins zugänglich
  * Zeigt aktive VPN-Verbindungen und Statistiken
  */
-router.get('/status', requireRoles(['admin']), async (req, res) => {
+router.get('/status', requireRoles(['admin']), async (req: Request, res: Response) => {
   try {
     const actor = (req.session as any).user?.id as string | undefined;
     
@@ -91,7 +92,7 @@ router.get('/status', requireRoles(['admin']), async (req, res) => {
  * Einfacher Check ob VPN-Service läuft
  * Zugänglich für alle authentifizierten Benutzer
  */
-router.get('/health', async (req, res) => {
+router.get('/health', async (req: Request, res: Response) => {
   try {
     await execAsync('systemctl is-active wg-quick@wg0');
     res.json({ status: 'ok', vpn: 'active' });

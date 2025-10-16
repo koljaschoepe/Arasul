@@ -1,14 +1,16 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { getUserWithRolesByEmail, verifyPassword, verifyTotp, generateTotpSecret, hashPassword, validatePasswordPolicy, generateRecoveryCodes, generateTotpUri } from '../services/authService.js';
+import type { UserWithRolesAndRecovery } from '../services/authService.js';
 import { writeAudit } from '../services/auditService.js';
 import QRCode from 'qrcode';
 
 const router = Router();
 
-router.post('/login', async (req, res) => {
+router.post('/login', async (req: Request, res: Response) => {
   const { email, password, totp, recoveryCode } = req.body as { email: string; password: string; totp?: string; recoveryCode?: string };
-  const user = await getUserWithRolesByEmail(email);
+  const user: UserWithRolesAndRecovery | null = await getUserWithRolesByEmail(email);
   if (!user || !user.isActive) return res.status(401).json({ error: 'invalid credentials' });
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) return res.status(401).json({ error: 'invalid credentials' });
@@ -27,7 +29,7 @@ router.post('/login', async (req, res) => {
           remainingCodes = codes.filter(c => c !== hashedCode);
           await prisma.user.update({
             where: { id: user.id },
-            data: { recoveryCodes: JSON.stringify(remainingCodes) }
+            data: { recoveryCodes: JSON.stringify(remainingCodes) } as any,
           });
           await writeAudit({ actorUserId: user.id, entityType: 'Auth', action: 'RECOVERY_LOGIN' });
           break;
@@ -41,20 +43,20 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: '2fa required' });
     }
   }
-  const roles = user.roles.filter(r => r.role.isActive).map(r => r.role.name);
+  const roles = user.roles.filter((r) => r.role.isActive).map((r) => r.role.name);
   (req.session as any).user = { id: user.id, email: user.email, roles };
   await writeAudit({ actorUserId: user.id, entityType: 'Auth', action: 'LOGIN' });
   return res.json({ ok: true });
 });
 
-router.post('/logout', async (req, res) => {
+router.post('/logout', async (req: Request, res: Response) => {
   const actor = (req.session as any).user?.id as string | undefined;
   await writeAudit({ actorUserId: actor || null, entityType: 'Auth', action: 'LOGOUT' });
   req.session.destroy(() => { /* explicit noop */ });
   res.json({ ok: true });
 });
 
-router.post('/enable-2fa', async (req, res) => {
+router.post('/enable-2fa', async (req: Request, res: Response) => {
   const actor = (req.session as any).user as { id: string; email: string } | undefined;
   if (!actor) return res.status(401).json({ error: 'unauthenticated' });
   
@@ -70,13 +72,13 @@ router.post('/enable-2fa', async (req, res) => {
   const otpauthUrl = generateTotpUri(actor.email, secret);
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
   
-  await prisma.user.update({ 
-    where: { id: actor.id }, 
-    data: { 
-      twoFactorSecret: secret, 
+  await prisma.user.update({
+    where: { id: actor.id },
+    data: {
+      twoFactorSecret: secret,
       twoFactorEnabled: true,
-      recoveryCodes: JSON.stringify(hashedCodes)
-    } 
+      recoveryCodes: JSON.stringify(hashedCodes),
+    } as any,
   });
   
   await writeAudit({ actorUserId: actor.id, entityType: 'User', action: 'ENABLE_2FA', targetUserId: actor.id });
@@ -88,7 +90,7 @@ router.post('/enable-2fa', async (req, res) => {
   });
 });
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', async (req: Request, res: Response) => {
   const actor = (req.session as any).user as { id: string } | undefined;
   if (!actor) return res.status(401).json({ error: 'unauthenticated' });
   const { userId, newPassword } = req.body as { userId: string; newPassword: string };

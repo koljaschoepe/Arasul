@@ -1,6 +1,7 @@
 import argon2 from 'argon2';
 import bcrypt from 'bcrypt';
 import { prisma } from '../utils/prisma.js';
+import type { Prisma } from '@prisma/client';
 import { authenticator } from 'otplib';
 import zxcvbn from 'zxcvbn';
 
@@ -75,9 +76,34 @@ export function generateTotpUri(email: string, secret: string): string {
   return authenticator.keyuri(email, 'Jetson Dashboard', secret);
 }
 
-export async function getUserWithRolesByEmail(email: string) {
+export type UserWithRolesAndRecovery = Prisma.UserGetPayload<{
+  select: {
+    id: true;
+    email: true;
+    name: true;
+    passwordHash: true;
+    isActive: true;
+    twoFactorEnabled: true;
+    twoFactorSecret: true;
+    recoveryCodes: true;
+    roles: { select: { role: true } };
+  };
+}>;
+
+export async function getUserWithRolesByEmail(email: string): Promise<UserWithRolesAndRecovery | null> {
+  // Selektiere explizit alle benötigten Felder, damit die Typen vollständig sind
   return prisma.user.findUnique({
     where: { email },
-    include: { roles: { include: { role: true } } },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      passwordHash: true,
+      isActive: true,
+      twoFactorEnabled: true,
+      twoFactorSecret: true,
+      recoveryCodes: true,
+      roles: { select: { role: true } },
+    },
   });
 }

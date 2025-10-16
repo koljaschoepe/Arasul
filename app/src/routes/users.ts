@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { requireRoles } from '../middlewares/rbac.js';
 import { hashPassword, validatePasswordPolicy } from '../services/authService.js';
@@ -6,12 +7,12 @@ import { writeAudit } from '../services/auditService.js';
 
 const router = Router();
 
-router.get('/', requireRoles(['admin']), async (_req, res) => {
+router.get('/', requireRoles(['admin']), async (_req: Request, res: Response) => {
   const users = await prisma.user.findMany({ include: { roles: { include: { role: true } } } });
   res.json(users);
 });
 
-router.post('/', requireRoles(['admin']), async (req, res) => {
+router.post('/', requireRoles(['admin']), async (req: Request, res: Response) => {
   const actor = (req.session as any).user?.id as string | undefined;
   const { email, name, password, isActive } = req.body as any;
   
@@ -27,7 +28,7 @@ router.post('/', requireRoles(['admin']), async (req, res) => {
   res.status(201).json(created);
 });
 
-router.put('/:id', requireRoles(['admin']), async (req, res) => {
+router.put('/:id', requireRoles(['admin']), async (req: Request, res: Response) => {
   const actor = (req.session as any).user?.id as string | undefined;
   const id: string = req.params.id as string;
   const before = await prisma.user.findUnique({ where: { id } });
@@ -38,7 +39,7 @@ router.put('/:id', requireRoles(['admin']), async (req, res) => {
   res.json(updated);
 });
 
-router.delete('/:id', requireRoles(['admin']), async (req, res) => {
+router.delete('/:id', requireRoles(['admin']), async (req: Request, res: Response) => {
   const actor = (req.session as any).user?.id as string | undefined;
   const id: string = req.params.id as string;
   const before = await prisma.user.findUnique({ where: { id } });
@@ -48,7 +49,7 @@ router.delete('/:id', requireRoles(['admin']), async (req, res) => {
   res.status(204).end();
 });
 
-router.post('/:id/roles', requireRoles(['admin']), async (req, res) => {
+router.post('/:id/roles', requireRoles(['admin']), async (req: Request, res: Response) => {
   const actor = (req.session as any).user?.id as string | undefined;
   const id: string = req.params.id as string;
   const { roleIds } = req.body as { roleIds: string[] };

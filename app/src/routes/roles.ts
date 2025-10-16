@@ -1,16 +1,17 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { prisma } from '../utils/prisma.js';
 import { requireRoles } from '../middlewares/rbac.js';
 import { writeAudit } from '../services/auditService.js';
 
 const router = Router();
 
-router.get('/', requireRoles(['admin']), async (_req, res) => {
+router.get('/', requireRoles(['admin']), async (_req: Request, res: Response) => {
   const roles = await prisma.role.findMany();
   res.json(roles);
 });
 
-router.post('/', requireRoles(['admin']), async (req, res) => {
+router.post('/', requireRoles(['admin']), async (req: Request, res: Response) => {
   const actor = (req.session as any).user?.id as string | undefined;
   const { name, description, isActive } = req.body as any;
   const created = await prisma.role.create({ data: { name, description, isActive: isActive ?? true } });
@@ -18,7 +19,7 @@ router.post('/', requireRoles(['admin']), async (req, res) => {
   res.status(201).json(created);
 });
 
-router.put('/:id', requireRoles(['admin']), async (req, res) => {
+router.put('/:id', requireRoles(['admin']), async (req: Request, res: Response) => {
   const actor = (req.session as any).user?.id as string | undefined;
   const id: string = req.params.id as string;
   const before = await prisma.role.findUnique({ where: { id } });
@@ -29,7 +30,7 @@ router.put('/:id', requireRoles(['admin']), async (req, res) => {
   res.json(updated);
 });
 
-router.delete('/:id', requireRoles(['admin']), async (req, res) => {
+router.delete('/:id', requireRoles(['admin']), async (req: Request, res: Response) => {
   const actor = (req.session as any).user?.id as string | undefined;
   const id: string = req.params.id as string;
   const before = await prisma.role.findUnique({ where: { id } });

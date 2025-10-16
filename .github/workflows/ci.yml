@@ -9,6 +9,8 @@ on:
 env:
   NODE_VERSION: '20'
   SESSION_SECRET: 'test-secret-for-ci'
+  # Für Prisma/SQLite in CI: relativ zum Arbeitsverzeichnis der App
+  DATABASE_URL: 'file:./prisma/dev.db'
 
 jobs:
   # ==========================================================================
@@ -73,12 +75,17 @@ jobs:
         working-directory: ./app
         run: npx prisma generate
 
+      - name: Sync DB schema (Prisma DB Push)
+        working-directory: ./app
+        run: npx prisma db push
+
       - name: Run Unit Tests
         working-directory: ./app
         run: npm test -- --coverage --verbose
         env:
           NODE_ENV: test
           SESSION_SECRET: ${{ env.SESSION_SECRET }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: Upload Coverage Report
         uses: codecov/codecov-action@v3
@@ -114,12 +121,17 @@ jobs:
         working-directory: ./app
         run: npx prisma generate
 
+      - name: Sync DB schema (Prisma DB Push)
+        working-directory: ./app
+        run: npx prisma db push
+
       - name: Run Security-Header Tests (E1.2)
         working-directory: ./app
         run: npm test -- e12_tls_security_headers.test.ts --verbose
         env:
           NODE_ENV: test
           SESSION_SECRET: ${{ env.SESSION_SECRET }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: Report Security Test Results
         if: always()
@@ -151,7 +163,7 @@ jobs:
           # Temporäres docker-compose.ci.yml verwenden
           cp docker-compose.yml docker-compose.ci.yml
           # step-ca für CI deaktivieren (optional)
-          docker-compose -f docker-compose.ci.yml up -d api
+          docker compose -f docker-compose.ci.yml up -d api
         env:
           SESSION_SECRET: ${{ env.SESSION_SECRET }}
 
@@ -174,12 +186,12 @@ jobs:
       - name: Docker Logs (on failure)
         if: failure()
         run: |
-          docker-compose -f docker-compose.ci.yml logs
+          docker compose -f docker-compose.ci.yml logs
 
       - name: Cleanup
         if: always()
         run: |
-          docker-compose -f docker-compose.ci.yml down -v
+          docker compose -f docker-compose.ci.yml down -v
 
   # ==========================================================================
   # Job 5: TLS & Security Validation
@@ -195,13 +207,13 @@ jobs:
 
       - name: Start Full Stack (with Caddy)
         run: |
-          docker-compose up -d
+          docker compose up -d
         env:
           SESSION_SECRET: ${{ env.SESSION_SECRET }}
 
       - name: Wait for Services
         run: |
-          timeout 90 bash -c 'until docker-compose ps | grep -q "caddy.*Up"; do sleep 2; done'
+          timeout 90 bash -c 'until docker compose ps | grep -q "caddy.*Up"; do sleep 2; done'
           echo "✓ Services gestartet"
 
       - name: Install testssl.sh
@@ -229,13 +241,13 @@ jobs:
       - name: Docker Logs (on failure)
         if: failure()
         run: |
-          docker-compose logs caddy
-          docker-compose logs api
+          docker compose logs caddy
+          docker compose logs api
 
       - name: Cleanup
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
 
   # ==========================================================================
   # Job 6: Build Summary & Notifications
