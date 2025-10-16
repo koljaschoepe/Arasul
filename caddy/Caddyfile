@@ -49,9 +49,6 @@ https://:443 {
     reverse_proxy /api/* api:3000 {
         # Client-IP-Propagierung für korrekte Audit-Logs
         header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-        header_up X-Forwarded-Host {host}
     }
 
     # n8n Automation Platform
@@ -97,15 +94,16 @@ https://:443 {
     # TODO: In MVP zu Backend-Admin-UI, später zu React-Dashboard
     reverse_proxy / api:3000 {
         header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
     }
 }
 
-# HTTP Server (Port 80) - Redirect zu HTTPS
-http://arasul.local:80 {
-    # 301 Permanent Redirect zu HTTPS
-    redir https://arasul.local{uri} permanent
+# HTTP Server (Port 80) – allgemein für localhost & interne Nutzung
+http://:80 {
+    # Health direkt erreichbar halten (für einfache Probes ohne TLS)
+    reverse_proxy /health api:3000
+
+    # Sonst auf HTTPS umleiten, Host übernehmen
+    redir https://{host}{uri} permanent
 }
 
 # MIGRATION NOTES (Phase 1.5 - step-ca Integration):
