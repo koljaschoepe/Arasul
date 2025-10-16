@@ -113,7 +113,21 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Trivy
+      - name: Trivy Scan (PR tolerant)
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
+          scanners: 'vuln,secret,config'
+          timeout: '5m'
+
+      - name: Trivy Scan (strict on push)
+        if: github.event_name == 'push'
         uses: aquasecurity/trivy-action@0.24.0
         with:
           scan-type: 'fs'
