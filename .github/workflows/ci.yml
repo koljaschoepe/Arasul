@@ -263,7 +263,15 @@ jobs:
       - name: Start Full Stack (with Caddy)
         working-directory: ./
         run: |
-          docker compose up -d step-ca caddy api
+          # Temporäres TLS-Override: mappe Host-Port 8443 -> Container 443, um mögliche Beschränkungen auf 443 zu vermeiden
+          cat > docker-compose.tls.override.yml <<'YAML'
+          services:
+            caddy:
+              ports:
+                - "80:80"
+                - "8443:443"
+          YAML
+          docker compose -f docker-compose.yml -f docker-compose.tls.override.yml up -d step-ca caddy api
         env:
           SESSION_SECRET: ${{ env.SESSION_SECRET }}
 
@@ -271,14 +279,14 @@ jobs:
         working-directory: ./
         run: |
           # Warte bis caddy und api Container laufen
-          timeout 180 bash -c 'until docker compose ps | grep -q "caddy.*Up"; do sleep 2; done'
-          timeout 180 bash -c 'until docker compose ps | grep -q "api.*Up"; do sleep 2; done'
+          timeout 180 bash -c 'until docker compose -f docker-compose.yml -f docker-compose.tls.override.yml ps | grep -q "caddy.*Up"; do sleep 2; done'
+          timeout 180 bash -c 'until docker compose -f docker-compose.yml -f docker-compose.tls.override.yml ps | grep -q "api.*Up"; do sleep 2; done'
           echo "✓ Services gestartet"
           echo "Warte bis API (HTTP) bereit ist..."
           timeout 180 bash -c 'until curl -sf http://localhost:3000/health; do sleep 2; done'
           echo "✓ API Health (HTTP) erreichbar"
           echo "Warte bis HTTPS (über Caddy) bereit ist..."
-          timeout 180 bash -c 'until curl -skI https://localhost/health | grep -q "200"; do sleep 2; done'
+          timeout 180 bash -c 'until curl -skI https://localhost:8443/health | grep -q "200"; do sleep 2; done'
           echo "✓ HTTPS Health erreichbar"
 
       - name: Install testssl.sh
@@ -307,14 +315,14 @@ jobs:
         if: failure()
         working-directory: ./
         run: |
-          docker compose logs caddy
-          docker compose logs api
+          docker compose -f docker-compose.yml -f docker-compose.tls.override.yml logs caddy
+          docker compose -f docker-compose.yml -f docker-compose.tls.override.yml logs api
 
       - name: Cleanup
         if: always()
         working-directory: ./
         run: |
-          docker compose down -v
+          docker compose -f docker-compose.yml -f docker-compose.tls.override.yml down -v
 
   # ==========================================================================
   # Job 6: Build Summary & Notifications
