@@ -270,10 +270,15 @@ jobs:
       - name: Wait for Services
         working-directory: ./
         run: |
-          timeout 120 bash -c 'until docker compose ps | grep -q "caddy.*Up"; do sleep 2; done'
+          # Warte bis caddy und api Container laufen
+          timeout 180 bash -c 'until docker compose ps | grep -q "caddy.*Up"; do sleep 2; done'
+          timeout 180 bash -c 'until docker compose ps | grep -q "api.*Up"; do sleep 2; done'
           echo "✓ Services gestartet"
-          echo "Warte bis HTTPS bereit ist..."
-          timeout 120 bash -c 'until curl -skI https://localhost/health | grep -q "200"; do sleep 2; done'
+          echo "Warte bis API (HTTP) bereit ist..."
+          timeout 180 bash -c 'until curl -sf http://localhost:3000/health; do sleep 2; done'
+          echo "✓ API Health (HTTP) erreichbar"
+          echo "Warte bis HTTPS (über Caddy) bereit ist..."
+          timeout 180 bash -c 'until curl -skI https://localhost/health | grep -q "200"; do sleep 2; done'
           echo "✓ HTTPS Health erreichbar"
 
       - name: Install testssl.sh
