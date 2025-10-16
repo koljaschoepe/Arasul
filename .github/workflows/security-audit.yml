@@ -8,6 +8,11 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
 jobs:
   # ==========================================================================
   # Job 1: Dependency Audit
@@ -71,6 +76,8 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Trivy (Table Output)
         uses: aquasecurity/trivy-action@master
@@ -90,9 +97,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Ensure Docker Compose (plugin) is available
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose-plugin
+          docker compose version
+
       - name: Start Services
         run: |
-          docker-compose up -d
+          docker compose up -d
         env:
           SESSION_SECRET: 'audit-secret'
 
@@ -141,7 +154,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
 
   # ==========================================================================
   # Job 4: TLS Certificate Expiry Check
@@ -154,15 +167,21 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Ensure Docker Compose (plugin) is available
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose-plugin
+          docker compose version
+
       - name: Start Services
         run: |
-          docker-compose up -d
+          docker compose up -d
         env:
           SESSION_SECRET: 'audit-secret'
 
       - name: Wait for Caddy
         run: |
-          timeout 60 bash -c 'until docker-compose ps | grep -q "caddy.*Up"; do sleep 2; done'
+          timeout 60 bash -c 'until docker compose ps | grep -q "caddy.*Up"; do sleep 2; done'
 
       - name: Check Certificate Expiry
         run: |
@@ -185,7 +204,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
 
   # ==========================================================================
   # Job 5: Security Audit Summary
