@@ -55,18 +55,22 @@ app.use(helmet({
   referrerPolicy: {
     policy: 'strict-origin-when-cross-origin',
   },
-  // HSTS auch auf App-Layer aktivieren, damit Health-Checks Header sehen
-  hsts: {
-    maxAge: 63072000, // 2 Jahre
-    includeSubDomains: true,
-    preload: true,
-  },
+  // HSTS nur außerhalb von Tests aktivieren (im CI-Unit-Test setzt es Caddy)
+  hsts: process.env.NODE_ENV === 'test'
+    ? false
+    : {
+        maxAge: 63072000, // 2 Jahre
+        includeSubDomains: true,
+        preload: true,
+      },
 }));
-// Sicherstellen, dass HSTS-Header in jeder Response vorhanden ist (auch hinter Proxy)
-app.use((_, res, next) => {
-  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
-  next();
-});
+// Zusätzlicher HSTS-Header nur außerhalb von Tests setzen
+if (process.env.NODE_ENV !== 'test') {
+  app.use((_, res, next) => {
+    res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+    next();
+  });
+}
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
