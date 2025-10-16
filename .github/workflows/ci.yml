@@ -96,6 +96,37 @@ jobs:
         continue-on-error: true
 
   # ==========================================================================
+  # Job 2b: Container Security Scan (Trivy)
+  # ==========================================================================
+  container-scan:
+    name: Container Security Scan (Trivy)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          scanners: 'vuln,secret,config'
+          timeout: '5m'
+
+      - name: Upload Trivy SARIF to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # ==========================================================================
   # Job 3: Security-Header Integration Tests
   # ==========================================================================
   security-tests:
@@ -211,15 +242,18 @@ jobs:
       - name: Start Full Stack (with Caddy)
         working-directory: ./
         run: |
-          docker compose up -d caddy api
+          docker compose up -d step-ca caddy api
         env:
           SESSION_SECRET: ${{ env.SESSION_SECRET }}
 
       - name: Wait for Services
         working-directory: ./
         run: |
-          timeout 90 bash -c 'until docker compose ps | grep -q "caddy.*Up"; do sleep 2; done'
+          timeout 120 bash -c 'until docker compose ps | grep -q "caddy.*Up"; do sleep 2; done'
           echo "✓ Services gestartet"
+          echo "Warte bis HTTPS bereit ist..."
+          timeout 120 bash -c 'until curl -skI https://localhost/health | grep -q "200"; do sleep 2; done'
+          echo "✓ HTTPS Health erreichbar"
 
       - name: Install testssl.sh
         run: |
