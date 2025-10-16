@@ -20,6 +20,7 @@
   "type": "module",
   "dependencies": {
     "@prisma/client": "^6.17.1",
+    "connect-sqlite3": "^0.9.0",
     "argon2": "^0.44.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",

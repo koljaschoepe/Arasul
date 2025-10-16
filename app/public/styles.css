@@ -1,5 +1,6 @@
 body { font-family: system-ui, Arial, sans-serif; margin: 2rem; }
 nav a { margin-right: 1rem; }
+form.inline { display: inline; }
 label { display: block; margin-bottom: .5rem; }
 input { margin-left: .5rem; }
 button { margin-top: .5rem; }

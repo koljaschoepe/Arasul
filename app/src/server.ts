@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import connectSqlite3 from 'connect-sqlite3';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import { doubleCsrf } from 'csrf-csrf';
@@ -29,6 +30,9 @@ if (!process.env.SESSION_SECRET && process.env.NODE_ENV === 'production') {
 
 const app = express();
 
+// Hinter Proxy (Caddy) korrekte Protokoll-/IP-Erkennung
+app.set('trust proxy', 1);
+
 // view engine setup
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,8 +46,8 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       frameSrc: ["'self'"],  // Erforderlich für Guacamole-Iframe
-      scriptSrc: ["'self'", "'unsafe-inline'"],  // EJS-Templates benötigen unsafe-inline
-      styleSrc: ["'self'", "'unsafe-inline'"],   // EJS-Templates benötigen unsafe-inline
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'"],
       imgSrc: ["'self'", "data:"],
       connectSrc: ["'self'"],
       fontSrc: ["'self'"],
@@ -76,10 +80,17 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Session-Konfiguration mit Härtung
+const SQLiteStore = connectSqlite3(session);
 app.use(session({
   secret: process.env.SESSION_SECRET || 'change-me',
   resave: false,
   saveUninitialized: false,
+  rolling: true,
+  store: new SQLiteStore({
+    // Sessions in persistente Datei im Volume /app/data
+    db: 'sessions.sqlite',
+    dir: path.join(__dirname, '..', 'data')
+  }),
   cookie: {
     secure: process.env.NODE_ENV === 'production', // true in Produktion
     httpOnly: true,
@@ -138,7 +149,16 @@ app.use(trackSecurityHeaders);
 app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 
 // Prometheus Metrics Endpoint
-app.get('/metrics', metricsHandler);
+// Optionaler Schutz: Authorization: Bearer <METRICS_TOKEN>
+const metricsToken = process.env.METRICS_TOKEN;
+app.get('/metrics', (req, res, next) => {
+  if (!metricsToken) return next();
+  const auth = req.header('authorization');
+  if (auth && auth.startsWith('Bearer ') && auth.substring(7) === metricsToken) {
+    return next();
+  }
+  return res.status(401).json({ error: 'unauthorized' });
+}, metricsHandler);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
