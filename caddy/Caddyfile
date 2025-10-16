@@ -97,10 +97,45 @@ https://:443 {
     }
 }
 
+# Zusätzlicher HTTPS-Listener auf Port 8443 (für CI-Umgebungen ohne 443)
+https://:8443 {
+    tls internal {
+        protocols tls1.2 tls1.3
+    }
+
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        Content-Security-Policy "default-src 'self'"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Resource-Policy "same-origin"
+        -Server
+        -X-Powered-By
+    }
+
+    reverse_proxy /api/* api:3000 {
+        header_up X-Real-IP {remote_host}
+    }
+
+    reverse_proxy /health api:3000
+
+    reverse_proxy / api:3000 {
+        header_up X-Real-IP {remote_host}
+    }
+}
+
 # HTTP Server (Port 80) – allgemein für localhost & interne Nutzung
 http://:80 {
-    # Health direkt beantworten (ohne Upstream), damit CI-HTTP-Check stabil ist
-    respond /health 200
+    # Health direkt erreichbar halten (für einfache Probes ohne TLS)
+    reverse_proxy /health api:3000
 
     # Sonst auf HTTPS umleiten, Host übernehmen
     redir https://{host}{uri} permanent
