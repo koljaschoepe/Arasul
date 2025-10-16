@@ -55,7 +55,12 @@ app.use(helmet({
   referrerPolicy: {
     policy: 'strict-origin-when-cross-origin',
   },
-  hsts: false,  // HSTS wird von Caddy gesetzt (Transport-Layer)
+  // HSTS auch auf App-Layer aktivieren, damit Health-Checks Header sehen
+  hsts: {
+    maxAge: 63072000, // 2 Jahre
+    includeSubDomains: true,
+    preload: true,
+  },
 }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());

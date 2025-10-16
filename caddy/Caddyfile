@@ -18,7 +18,7 @@ https://:443 {
     # Content-Security-Header werden von Helmet (Express) gesetzt
     header {
         # HSTS: HTTP Strict Transport Security
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
         # Zusätzliche Security-Header (falls App/Helmet sie nicht setzt)
         Content-Security-Policy "default-src 'self'"
         X-Frame-Options "DENY"
