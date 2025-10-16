@@ -211,7 +211,7 @@ jobs:
       - name: Start Full Stack (with Caddy)
         working-directory: ./
         run: |
-          docker compose up -d
+          docker compose up -d caddy api
         env:
           SESSION_SECRET: ${{ env.SESSION_SECRET }}
 
